@@ -1,0 +1,11 @@
+{
+  "model_name": "autoencoder",
+  "encoding_dim": 16,
+  "threshold": 3605.793353608945,
+  "threshold_percentile": 95.0,
+  "training_time_s": 2.31,
+  "prediction_latency_ms": 0.0019,
+  "n_samples_train": 23437,
+  "n_samples_test": 6697,
+  "avg_reconstruction_error": 3513.8065516146535
+}

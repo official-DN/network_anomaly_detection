@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block title %}Analytics — AI Anomaly Detection{% endblock %}
+
+{% block content %}
+<div class="page-title">Analytics</div>
+<div class="page-sub">Deep insights into network traffic patterns and threat trends</div>
+
+<!-- Summary cards -->
+<div class="cards">
+  <div class="card">
+    <div class="card-label">Avg Packets/Flow</div>
+    <div class="card-val c-cyan">{{ stats.avg_packets_per_flow }}</div>
+  </div>
+  <div class="card">
+    <div class="card-label">Avg Bytes/Flow</div>
+    <div class="card-val c-yellow">{{ stats.avg_bytes_per_flow }}</div>
+  </div>
+  <div class="card">
+    <div class="card-label">Anomaly %</div>
+    <div class="card-val c-red">{{ stats.anomaly_percentage }}%</div>
+  </div>
+  <div class="card">
+    <div class="card-label">Unique Protocols</div>
+    <div class="card-val c-purple">{{ stats.protocol_distribution | length }}</div>
+  </div>
+</div>
+
+<!-- 24h Timeline -->
+<div class="chart-box full" style="margin-bottom:20px">
+  <div class="chart-title">📈 24h Traffic Timeline</div>
+  <canvas id="chartTimeline" height="90"></canvas>
+</div>
+
+<!-- Protocol + Attacks -->
+<div class="charts two">
+  <div class="chart-box">
+    <div class="chart-title">🌐 Protocol Mix</div>
+    <canvas id="chartProto" height="160"></canvas>
+  </div>
+  <div class="chart-box">
+    <div class="chart-title">⚔️ Attack Types</div>
+    <canvas id="chartAttacks" height="160"></canvas>
+  </div>
+</div>
+
+<!-- Top Source IPs -->
+<div class="table-wrap">
+  <div class="chart-title">🔝 Top Source IPs</div>
+  <table>
+    <thead><tr><th>IP Address</th><th>Event Count</th><th>Share</th></tr></thead>
+    <tbody>
+      {% set total = stats.top_src_ips | sum(attribute='count') or 1 %}
+      {% for item in stats.top_src_ips %}
+      <tr>
+        <td class="mono">{{ item.ip }}</td>
+        <td>{{ item.count }}</td>
+        <td>
+          <div class="score-wrap">
+            <div class="score-bar" style="width:120px">
+              <div class="score-fill" style="width:{{ ((item.count / total)*100)|int }}%"></div>
+            </div>
+            <span class="score-pct">{{ ((item.count/total)*100)|round(1) }}%</span>
+          </div>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="3" class="empty">No data</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const tl = {{ timeline | tojson }};
+const pd = {{ stats.protocol_distribution | tojson }};
+const at = {{ threats.attack_distribution | tojson }};
+
+makeChart('chartTimeline','line',
+  tl.map(d=>d.timestamp.slice(11,16)),
+  [
+    { label:'Total',   data:tl.map(d=>d.total),     borderColor:'#00d4ff', backgroundColor:'rgba(0,212,255,.08)', fill:true, tension:.4, pointRadius:2 },
+    { label:'Anomaly', data:tl.map(d=>d.anomalies), borderColor:'#ff3366', backgroundColor:'rgba(255,51,102,.08)', fill:true, tension:.4, pointRadius:2 },
+  ]
+)
+
+const pk = Object.keys(pd)
+makeChart('chartProto','doughnut', pk,
+  [{ data: pk.map(k=>pd[k]), backgroundColor:['#00d4ff','#8b5cf6','#ffaa00','#ff3366','#00ff88'], borderWidth:0 }]
+)
+
+const ak = Object.keys(at)
+if (ak.length) {
+  makeChart('chartAttacks','bar', ak,
+    [{ label:'Count', data:ak.map(k=>at[k]), backgroundColor:'#ff3366', borderRadius:4 }],
+    { indexAxis:'y', plugins:{ legend:{ display:false } } }
+  )
+}
+
+setTimeout(()=>location.reload(), 15000)
+</script>
+{% endblock %}

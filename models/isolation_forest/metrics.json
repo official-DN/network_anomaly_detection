@@ -1,0 +1,10 @@
+{
+  "model_name": "isolation_forest",
+  "contamination": 0.1,
+  "training_time_s": 0.46,
+  "prediction_latency_ms": 0.0088,
+  "n_samples_train": 23437,
+  "n_samples_test": 6697,
+  "detected_anomalies": 641,
+  "anomaly_rate_detected": 0.0957
+}

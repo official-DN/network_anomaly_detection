@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — AI Anomaly Detection{% endblock %}
+
+{% block content %}
+<div class="page-title">Security Dashboard</div>
+<div class="page-sub">Real-time network anomaly monitoring</div>
+
+<!-- KPI Cards -->
+<div class="cards">
+  <div class="card">
+    <div class="card-label">Total Events</div>
+    <div class="card-val c-cyan">{{ stats.total_events }}</div>
+    <div class="card-sub">Analyzed flows</div>
+  </div>
+  <div class="card">
+    <div class="card-label">Anomalies</div>
+    <div class="card-val c-red">{{ stats.anomaly_count }}</div>
+    <div class="card-sub">{{ stats.anomaly_percentage }}% rate</div>
+  </div>
+  <div class="card">
+    <div class="card-label">Normal</div>
+    <div class="card-val c-green">{{ stats.normal_count }}</div>
+    <div class="card-sub">Clean traffic</div>
+  </div>
+  <div class="card">
+    <div class="card-label">Total Packets</div>
+    <div class="card-val c-yellow">{{ stats.total_packets }}</div>
+    <div class="card-sub">Captured</div>
+  </div>
+  <div class="card">
+    <div class="card-label">Total Alerts</div>
+    <div class="card-val c-red">{{ alerts | length }}</div>
+    <div class="card-sub">Generated</div>
+  </div>
+  <div class="card">
+    <div class="card-label">Total Bytes</div>
+    <div class="card-val c-purple">{{ (stats.total_bytes / 1048576) | round(1) }} MB</div>
+    <div class="card-sub">Transferred</div>
+  </div>
+</div>
+
+<!-- Charts -->
+<div class="charts">
+  <div class="chart-box">
+    <div class="chart-title">📈 Traffic Timeline (12h)</div>
+    <canvas id="chartTimeline" height="130"></canvas>
+  </div>
+  <div class="chart-box">
+    <div class="chart-title">🥧 Threat Distribution</div>
+    <canvas id="chartThreats" height="130"></canvas>
+  </div>
+</div>
+
+<!-- Recent Alerts -->
+<div class="table-wrap">
+  <div class="chart-title">🚨 Recent Alerts</div>
+  <table>
+    <thead>
+      <tr>
+        <th>Time</th><th>Source</th><th>Destination</th>
+        <th>Attack</th><th>Risk</th><th>Score</th><th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for a in alerts[:10] %}
+      <tr>
+        <td style="color:#64748b;font-size:11px">{{ a.timestamp[:19] }}</td>
+        <td class="mono">{{ a.src_ip }}:{{ a.src_port }}</td>
+        <td style="color:#94a3b8">{{ a.dst_ip }}:{{ a.dst_port }}</td>
+        <td>{{ a.attack_type or '—' }}</td>
+        <td><span class="tag tag-{{ a.risk_level }}">{{ a.risk_level }}</span></td>
+        <td>
+          <div class="score-wrap">
+            <div class="score-bar"><div class="score-fill" style="width:{{ (a.anomaly_score * 100)|int }}%"></div></div>
+            <span class="score-pct">{{ (a.anomaly_score * 100)|int }}%</span>
+          </div>
+        </td>
+        <td><span class="tag tag-{{ a.status }}">{{ a.status }}</span></td>
+      </tr>
+      {% else %}
+      <tr><td colspan="7" class="empty">No alerts yet — traffic is being analyzed…</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const tl = {{ timeline | tojson }};
+const th = {{ threats  | tojson }};
+
+makeChart('chartTimeline', 'line',
+  tl.map(d => d.timestamp.slice(11,16)),
+  [
+    { label:'Total',    data: tl.map(d=>d.total),     borderColor:'#00d4ff', backgroundColor:'rgba(0,212,255,.1)', fill:true, tension:.4, pointRadius:2 },
+    { label:'Anomaly',  data: tl.map(d=>d.anomalies), borderColor:'#ff3366', backgroundColor:'rgba(255,51,102,.1)', fill:true, tension:.4, pointRadius:2 },
+  ]
+)
+
+const ak = Object.keys(th.attack_distribution || {})
+if (ak.length) {
+  makeChart('chartThreats', 'doughnut', ak,
+    [{ data: ak.map(k=>th.attack_distribution[k]), backgroundColor:['#ff3366','#ffaa00','#8b5cf6','#00d4ff','#00ff88','#f97316'], borderWidth:0 }]
+  )
+}
+
+// Auto-refresh page every 10s
+setTimeout(() => location.reload(), 10000)
+</script>
+{% endblock %}

@@ -1,0 +1,58 @@
+# Core
+fastapi==0.109.2
+uvicorn[standard]==0.27.1
+python-multipart==0.0.9
+pydantic==2.6.1
+pydantic-settings==2.1.0
+python-dotenv==1.0.1
+
+# Authentication
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+
+# Database
+motor==3.3.2
+pymongo==4.6.2
+
+# Machine Learning
+scikit-learn==1.4.0
+xgboost==2.0.3
+numpy==1.26.4
+pandas==2.2.0
+scipy==1.12.0
+imbalanced-learn==0.12.0
+
+# Deep Learning (Autoencoder / LSTM)
+torch==2.2.0
+torchvision==0.17.0
+
+# Network
+scapy==2.5.0
+
+# Visualization
+plotly==5.18.0
+matplotlib==3.8.3
+seaborn==0.13.2
+
+# Model Persistence
+joblib==1.3.2
+
+# SHAP (Explainable AI)
+shap==0.44.1
+
+# Logging
+loguru==0.7.2
+
+# Testing
+pytest==8.0.2
+pytest-asyncio==0.23.5
+httpx==0.26.0
+
+# Utilities
+aiofiles==23.2.1
+python-dateutil==2.8.2
+tqdm==4.66.2
+
+# Jupyter
+jupyter==1.0.0
+ipykernel==6.29.3

@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}Traffic Monitor{% endblock %}
+
+{% block content %}
+<div class="page-title">Traffic Monitor</div>
+<div class="page-sub">Live network flow events and statistics</div>
+
+<!-- Stats -->
+<div class="cards">
+  <div class="card">
+    <div class="card-label">Total Events</div>
+    <div class="card-val c-cyan">{{ stats.total_events }}</div>
+  </div>
+  <div class="card">
+    <div class="card-label">Anomaly Rate</div>
+    <div class="card-val c-red">{{ stats.anomaly_percentage }}%</div>
+  </div>
+  <div class="card">
+    <div class="card-label">Avg Packets/Flow</div>
+    <div class="card-val c-yellow">{{ stats.avg_packets_per_flow }}</div>
+  </div>
+  <div class="card">
+    <div class="card-label">Avg Bytes/Flow</div>
+    <div class="card-val c-purple">{{ stats.avg_bytes_per_flow }}</div>
+  </div>
+</div>
+
+<!-- Protocol Chart -->
+<div class="charts two">
+  <div class="chart-box">
+    <div class="chart-title">🌐 Protocol Distribution</div>
+    <canvas id="chartProto" height="140"></canvas>
+  </div>
+  <div class="chart-box">
+    <div class="chart-title">🔝 Top Source IPs</div>
+    <table>
+      <thead><tr><th>IP</th><th>Flows</th></tr></thead>
+      <tbody>
+        {% for item in stats.top_src_ips[:8] %}
+        <tr>
+          <td class="mono">{{ item.ip }}</td>
+          <td style="color:#94a3b8">{{ item.count }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="2" class="empty">No data</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Traffic Events -->
+<div class="table-wrap">
+  <div class="chart-title" style="margin-bottom:12px">Recent Traffic Events
+    <a href="{{ url_for('traffic') }}" class="btn btn-cyan btn-sm" style="float:right">Refresh</a>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Source</th><th>Destination</th><th>Protocol</th>
+        <th>Packets</th><th>Bytes</th><th>Duration</th>
+        <th>Prediction</th><th>Score</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for e in events %}
+      <tr>
+        <td class="mono">{{ e.src_ip }}:{{ e.src_port }}</td>
+        <td style="color:#94a3b8">{{ e.dst_ip }}:{{ e.dst_port }}</td>
+        <td style="color:
+          {% if e.protocol=='TCP' %}#00d4ff
+          {% elif e.protocol=='UDP' %}#8b5cf6
+          {% else %}#ffaa00{% endif %}">{{ e.protocol }}</td>
+        <td>{{ e.packets }}</td>
+        <td>{{ e.bytes }}</td>
+        <td>{{ '%.3f'|format(e.duration) }}s</td>
+        <td><span class="tag tag-{{ e.prediction or 'NORMAL' }}">{{ e.prediction or '—' }}</span></td>
+        <td>
+          {% if e.anomaly_score is not none %}
+          <div class="score-wrap">
+            <div class="score-bar"><div class="score-fill" style="width:{{ (e.anomaly_score*100)|int }}%"></div></div>
+            <span class="score-pct">{{ (e.anomaly_score*100)|int }}%</span>
+          </div>
+          {% else %}—{% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="8" class="empty">No traffic events yet</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const pd = {{ proto_data | tojson }};
+const keys = Object.keys(pd)
+makeChart('chartProto', 'bar', keys,
+  [{ label:'Flows', data: keys.map(k=>pd[k]),
+     backgroundColor:['#00d4ff','#8b5cf6','#ffaa00','#ff3366','#00ff88'].slice(0,keys.length),
+     borderRadius:4 }],
+  { plugins:{ legend:{ display:false } } }
+)
+setTimeout(() => location.reload(), 15000)
+</script>
+{% endblock %}

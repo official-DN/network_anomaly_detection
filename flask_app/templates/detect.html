@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+{% block title %}Detect — AI Anomaly Detection{% endblock %}
+
+{% block content %}
+<div class="page-title">Anomaly Detection</div>
+<div class="page-sub">Submit a network flow for real-time AI analysis</div>
+
+<div class="detect-layout">
+
+  <!-- Form -->
+  <div class="table-wrap">
+    <div class="chart-title">🔍 Analyze Traffic Flow</div>
+    <form id="detectForm">
+      <div class="form-grid">
+        <div class="form-group"><label>Source IP</label><input name="src_ip" value="192.168.1.10"/></div>
+        <div class="form-group"><label>Destination IP</label><input name="dst_ip" value="10.0.0.5"/></div>
+      </div>
+      <div class="form-grid">
+        <div class="form-group"><label>Source Port</label><input name="src_port" type="number" value="52341"/></div>
+        <div class="form-group"><label>Destination Port</label><input name="dst_port" type="number" value="80"/></div>
+      </div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Protocol</label>
+          <select name="protocol"><option>TCP</option><option>UDP</option><option>ICMP</option></select>
+        </div>
+        <div class="form-group">
+          <label>Model</label>
+          <select name="model">
+            <option value="random_forest">Random Forest</option>
+            <option value="isolation_forest">Isolation Forest</option>
+            <option value="autoencoder">Autoencoder</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-grid">
+        <div class="form-group"><label>Packets</label><input name="packets" type="number" value="15"/></div>
+        <div class="form-group"><label>Bytes</label><input name="bytes" type="number" value="8200"/></div>
+      </div>
+      <div class="form-grid">
+        <div class="form-group"><label>Duration (s)</label><input name="duration" type="number" step="0.01" value="2.1"/></div>
+        <div class="form-group"><label>SYN Count</label><input name="syn_count" type="number" value="0"/></div>
+      </div>
+      <div class="btn-row">
+        <button type="submit" class="btn btn-cyan" style="flex:1">▶ Analyze</button>
+        <button type="button" class="btn btn-red"    onclick="loadDDoS()">⚠ DDoS Sample</button>
+        <button type="button" class="btn btn-green"  onclick="loadNormal()">✓ Normal Sample</button>
+      </div>
+    </form>
+
+    <!-- Result -->
+    <div id="result" style="display:none" class="result-box">
+      <div class="result-header">
+        <span class="result-title" id="res-title"></span>
+        <span id="res-risk"></span>
+      </div>
+      <div class="result-grid">
+        <div><div class="result-lbl">Attack Type</div><div id="res-attack"></div></div>
+        <div><div class="result-lbl">Risk Score</div><div id="res-score"></div></div>
+        <div><div class="result-lbl">Anomaly Score</div><div id="res-bar"></div></div>
+        <div><div class="result-lbl">Confidence</div><div id="res-conf"></div></div>
+        <div><div class="result-lbl">Model Used</div><div id="res-model" style="color:#00d4ff"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Prediction history -->
+  <div>
+    <div class="table-wrap">
+      <div class="chart-title">📋 Recent Predictions</div>
+      <table>
+        <thead><tr><th>Source</th><th>Result</th><th>Score</th><th>Model</th></tr></thead>
+        <tbody id="predHistory">
+          <tr><td colspan="4" class="empty">No predictions yet</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="chart-box">
+      <div class="chart-title">📊 Score Distribution</div>
+      <canvas id="chartScores" height="160"></canvas>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const history = []
+
+document.getElementById('detectForm').addEventListener('submit', async e => {
+  e.preventDefault()
+  const fd  = new FormData(e.target)
+  const res = await fetch('/api/detect', { method:'POST', body: fd })
+  const d   = await res.json()
+  if (!d.success) return
+
+  const r = d.result
+  const isAnom = r.prediction === 'ANOMALY'
+
+  document.getElementById('result').style.display = 'block'
+  document.getElementById('result').style.borderColor = isAnom ? 'rgba(255,51,102,.3)' : 'rgba(0,255,136,.3)'
+  document.getElementById('res-title').textContent = isAnom ? '⚠ ANOMALY DETECTED' : '✓ NORMAL TRAFFIC'
+  document.getElementById('res-title').style.color = isAnom ? '#ff3366' : '#00ff88'
+  document.getElementById('res-risk').innerHTML   = `<span class="tag tag-${r.risk_level}">${r.risk_level}</span>`
+  document.getElementById('res-attack').textContent = r.attack_type || 'None'
+  document.getElementById('res-score').textContent  = `${r.risk_score}/100`
+  document.getElementById('res-bar').innerHTML  = scoreBar(r.anomaly_score)
+  document.getElementById('res-conf').innerHTML = scoreBar(r.confidence)
+  document.getElementById('res-model').textContent = r.model_used
+
+  // Add to history
+  const src = fd.get('src_ip') + ':' + fd.get('src_port')
+  history.unshift({ src, prediction: r.prediction, score: r.anomaly_score, model: r.model_used })
+  if (history.length > 20) history.pop()
+
+  const tbody = document.getElementById('predHistory')
+  tbody.innerHTML = history.map(h => `<tr>
+    <td class="mono">${h.src}</td>
+    <td>${tag(h.prediction)}</td>
+    <td>${scoreBar(h.score)}</td>
+    <td style="color:#64748b">${h.model}</td>
+  </tr>`).join('')
+
+  updateScoreChart()
+})
+
+function updateScoreChart() {
+  const normals   = history.filter(h => h.prediction === 'NORMAL').map(h => h.score)
+  const anomalies = history.filter(h => h.prediction === 'ANOMALY').map(h => h.score)
+  makeChart('chartScores','bar',
+    history.map((_,i)=>`#${i+1}`),
+    [
+      { label:'Score', data: history.map(h=>+(h.score*100).toFixed(0)),
+        backgroundColor: history.map(h=>h.prediction==='ANOMALY'?'rgba(255,51,102,.7)':'rgba(0,255,136,.5)'),
+        borderRadius:4 }
+    ],
+    { plugins:{ legend:{ display:false } }, scales:{y:{min:0,max:100}} }
+  )
+}
+
+function loadDDoS() {
+  const f = document.getElementById('detectForm')
+  f.src_ip.value='198.51.100.99'; f.packets.value=50000; f.bytes.value=2500000
+  f.duration.value=0.5; f.dst_port.value=80; f.syn_count.value=48000
+}
+function loadNormal() {
+  const f = document.getElementById('detectForm')
+  f.src_ip.value='192.168.1.10'; f.packets.value=15; f.bytes.value=8200
+  f.duration.value=2.1; f.dst_port.value=443; f.syn_count.value=1
+}
+</script>
+{% endblock %}

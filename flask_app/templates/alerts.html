@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}Alerts — AI Anomaly Detection{% endblock %}
+
+{% block content %}
+<div class="page-title">Security Alerts</div>
+<div class="page-sub">Investigate and manage detected threats</div>
+
+<!-- Risk summary cards -->
+<div class="cards">
+  {% for level, color in [('CRITICAL','c-red'),('HIGH','c-yellow'),('MEDIUM','c-purple'),('LOW','c-green')] %}
+  <div class="card">
+    <div class="card-label">{{ level }}</div>
+    <div class="card-val {{ color }}">
+      {{ alerts | selectattr('risk_level','equalto',level) | list | length }}
+    </div>
+    <div class="card-sub">alerts</div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- Filters -->
+<form method="get" class="filter-row">
+  <span style="color:#64748b;font-size:12px">Filter:</span>
+  <select name="risk" onchange="this.form.submit()">
+    <option value="">All Risks</option>
+    {% for r in ['CRITICAL','HIGH','MEDIUM','LOW'] %}
+    <option value="{{ r }}" {% if request.args.get('risk')==r %}selected{% endif %}>{{ r }}</option>
+    {% endfor %}
+  </select>
+  <select name="status" onchange="this.form.submit()">
+    <option value="">All Statuses</option>
+    {% for s in ['NEW','INVESTIGATING','RESOLVED'] %}
+    <option value="{{ s }}" {% if request.args.get('status')==s %}selected{% endif %}>{{ s }}</option>
+    {% endfor %}
+  </select>
+  {% if request.args.get('risk') or request.args.get('status') %}
+  <a href="{{ url_for('alerts') }}" class="btn btn-sm" style="background:rgba(100,116,139,.1);border-color:#475569;color:#94a3b8">Clear</a>
+  {% endif %}
+  <span class="filter-count">{{ alerts|length }} alerts</span>
+</form>
+
+<!-- Alerts table -->
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Time</th><th>Source</th><th>Destination</th>
+        <th>Attack Type</th><th>Risk</th><th>Score</th>
+        <th>Model</th><th>Status</th><th>Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for a in alerts %}
+      <tr>
+        <td style="color:#64748b;font-size:11px">{{ a.timestamp[:19] }}</td>
+        <td class="mono">{{ a.src_ip }}:{{ a.src_port }}</td>
+        <td style="color:#94a3b8">{{ a.dst_ip }}:{{ a.dst_port }}</td>
+        <td>{{ a.attack_type or '—' }}</td>
+        <td><span class="tag tag-{{ a.risk_level }}">{{ a.risk_level }}</span></td>
+        <td>
+          <div class="score-wrap">
+            <div class="score-bar"><div class="score-fill" style="width:{{ (a.anomaly_score*100)|int }}%"></div></div>
+            <span class="score-pct">{{ (a.anomaly_score*100)|int }}%</span>
+          </div>
+        </td>
+        <td style="color:#64748b">{{ a.model_used }}</td>
+        <td><span class="tag tag-{{ a.status }}">{{ a.status }}</span></td>
+        <td>
+          {% if a.status == 'NEW' %}
+          <a href="{{ url_for('update_alert', alert_id=a.id, new_status='INVESTIGATING') }}"
+             class="btn btn-cyan btn-sm">Investigate</a>
+          {% elif a.status == 'INVESTIGATING' %}
+          <a href="{{ url_for('update_alert', alert_id=a.id, new_status='RESOLVED') }}"
+             class="btn btn-green btn-sm">Resolve</a>
+          {% else %}
+          <span style="color:#475569;font-size:11px">Done</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="9" class="empty">No alerts found</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>setTimeout(() => location.reload(), 15000)</script>
+{% endblock %}
